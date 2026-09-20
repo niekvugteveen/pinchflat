@@ -64,6 +64,17 @@ defmodule PinchflatWeb.Router do
     end
   end
 
+  # JSON API for clients that can't use the HTML CRUD - deliberately outside the `:browser`
+  # pipeline, so no basic auth and no CSRF. The `route_token` setting is the whole auth story.
+  scope "/api/v1", PinchflatWeb.Api.V1, as: :api_v1 do
+    pipe_through [:api, :api_token_protected_route]
+
+    get "/media_profiles", MediaProfileController, :index
+
+    get "/sources", SourceController, :index
+    post "/sources", SourceController, :create
+  end
+
   # No auth or CSRF protection for the health check endpoint
   scope "/", PinchflatWeb do
     pipe_through :api

@@ -54,6 +54,29 @@ defmodule PinchflatWeb.Plugs do
     send_unauthorized(conn)
   end
 
+  @doc """
+  Protects the JSON API routes with the `route_token` setting - the same token that protects
+  the OPML feed. Accepts the token either as an `Authorization: Bearer <token>` header or as a
+  `route_token` query parameter.
+
+  Unlike `token_protected_route/2` this uses `Plug.Crypto.secure_compare/2` and fails closed if
+  the `route_token` setting is unset or empty.
+
+  Sends a 401 JSON response and halts on failure.
+  """
+  def api_token_protected_route(conn, _opts) do
+    conn = fetch_query_params(conn)
+    expected_token = Settings.get!(:route_token)
+    given_token = bearer_token(conn) || conn.query_params["route_token"]
+
+    if credential_set?(expected_token) && is_binary(given_token) &&
+         Plug.Crypto.secure_compare(expected_token, given_token) do
+      conn
+    else
+      send_json_unauthorized(conn)
+    end
+  end
+
   defp credential_set?(credential) do
     credential && credential != ""
   end
@@ -61,6 +84,20 @@ defmodule PinchflatWeb.Plugs do
   defp send_unauthorized(conn) do
     conn
     |> send_resp(:unauthorized, "Unauthorized")
+    |> halt()
+  end
+
+  defp bearer_token(conn) do
+    case get_req_header(conn, "authorization") do
+      ["Bearer " <> token] -> token
+      _ -> nil
+    end
+  end
+
+  defp send_json_unauthorized(conn) do
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(:unauthorized, Phoenix.json_library().encode!(%{error: "unauthorized"}))
     |> halt()
   end
 end
