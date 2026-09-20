@@ -34,6 +34,8 @@ defmodule Pinchflat.Sources.Source do
     original_url
     download_cutoff_date
     retention_period_days
+    media_limit
+    media_limit_behaviour
     title_filter_regex
     media_profile_id
     output_path_template_override
@@ -84,6 +86,10 @@ defmodule Pinchflat.Sources.Source do
     # Only download media items that were published after this date
     field :download_cutoff_date, :date
     field :retention_period_days, :integer
+    # The maximum number of media items this source may keep on-disk at once.
+    # `nil` (or 0) means no limit. See `Pinchflat.Media.MediaLimits` for how this is enforced
+    field :media_limit, :integer
+    field :media_limit_behaviour, Ecto.Enum, values: [:wait_for_slot, :delete_oldest], default: :wait_for_slot
     field :original_url, :string
     field :title_filter_regex, :string
     field :output_path_template_override, :string
@@ -127,6 +133,7 @@ defmodule Pinchflat.Sources.Source do
     |> validate_title_regex()
     |> validate_min_and_max_durations()
     |> validate_number(:retention_period_days, greater_than_or_equal_to: 0)
+    |> validate_number(:media_limit, greater_than: 0)
     # Ensures it ends with `.{{ ext }}` or `.%(ext)s` or similar (with a little wiggle room)
     |> validate_format(:output_path_template_override, MediaProfile.ext_regex(), message: "must end with .{{ ext }}")
     |> validate_format(:original_url, youtube_channel_or_playlist_regex(), message: "must be a channel or playlist URL")

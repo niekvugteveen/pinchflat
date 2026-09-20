@@ -124,15 +124,25 @@ defmodule Pinchflat.Media.MediaQuery do
     )
   end
 
-  def pending do
+  # Everything that makes a media item a candidate for download, regardless of whether it
+  # has already been downloaded. `pending` is this plus "not downloaded yet" - this exists
+  # separately so that media limits can reason about a source's whole download window
+  # (see `Pinchflat.Media.MediaLimits`)
+  def eligible_for_download do
     dynamic(
       [mi],
-      not (^downloaded()) and
-        not (^download_prevented()) and
+      not (^download_prevented()) and
         ^upload_date_after_source_cutoff() and
         ^format_matching_profile_preference() and
         ^matches_source_title_regex() and
         ^meets_min_and_max_duration()
+    )
+  end
+
+  def pending do
+    dynamic(
+      [mi],
+      not (^downloaded()) and ^eligible_for_download()
     )
   end
 

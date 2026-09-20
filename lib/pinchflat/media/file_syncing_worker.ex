@@ -10,6 +10,7 @@ defmodule Pinchflat.Media.FileSyncingWorker do
   alias Pinchflat.Tasks
   alias Pinchflat.Sources
   alias Pinchflat.Media.FileSyncing
+  alias Pinchflat.Media.MediaLimits
 
   @doc """
   Starts the source file syncing worker.
@@ -32,6 +33,9 @@ defmodule Pinchflat.Media.FileSyncingWorker do
     source = Repo.preload(Sources.get_source!(source_id), :media_items)
 
     FileSyncing.sync_file_presence_on_disk(source.media_items)
+    # Files going missing frees up media limit slots, so let the source act on that right
+    # away rather than waiting for the next scheduled run. No-op for unlimited sources
+    :ok = MediaLimits.enforce_limit_for(source)
 
     :ok
   end

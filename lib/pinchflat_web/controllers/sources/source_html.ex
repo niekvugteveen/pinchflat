@@ -35,6 +35,13 @@ defmodule PinchflatWeb.Sources.SourceHTML do
     ]
   end
 
+  def friendly_media_limit_behaviours do
+    [
+      {"Wait for a free slot", :wait_for_slot},
+      {"Delete the oldest media", :delete_oldest}
+    ]
+  end
+
   def cutoff_date_presets do
     [
       {"7 days", compute_date_offset(7)},
@@ -70,6 +77,15 @@ defmodule PinchflatWeb.Sources.SourceHTML do
 
     """
     A PCRE-compatible regex. Only media with titles that match this regex will be downloaded. <a href="#{url}" class="#{classes}" target="_blank">See here</a> for syntax
+    """
+  end
+
+  def media_limit_behaviour_help do
+    """
+    Only applies once a Media Limit is set. <em>Wait for a free slot</em> stops downloading until one of the
+    files is gone - delete one (or let Kodi/Jellyfin delete it once you've watched it) and the next media item
+    is downloaded in its place. <em>Delete the oldest media</em> always keeps the newest media items, deleting
+    older ones to make room for newer ones
     """
   end
 
