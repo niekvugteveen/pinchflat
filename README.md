@@ -68,6 +68,7 @@ If it doesn't work for your use case, please make a feature request! You can als
 - Allows automatically redownloading new media after a set period
   - This can help improve the download quality of new content or improve SponsorBlock tags
 - Optionally automatically delete old content ([docs](https://github.com/kieraneglin/pinchflat/wiki/Automatically-Delete-Media))
+- Optionally cap how much a source keeps on-disk - keep only the newest _x_ media items, or download a new one each time you delete one
 - Advanced options like setting cutoff dates and filtering by title ([docs](https://github.com/kieraneglin/pinchflat/wiki/Frequently-Asked-Questions#i-only-want-certain-videos-from-a-source---how-can-i-only-download-those))
 - Reliable hands-off operation
 - Can pass cookies to YouTube to download your private playlists ([docs](https://github.com/kieraneglin/pinchflat/wiki/YouTube-Cookies))

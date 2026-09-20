@@ -966,6 +966,35 @@ defmodule Pinchflat.SourcesTest do
     end
   end
 
+  describe "change_source/3 when testing media limit validation" do
+    test "succeeds when the media limit is blank" do
+      source = source_fixture()
+
+      assert %{errors: []} = Sources.change_source(source, %{media_limit: nil})
+    end
+
+    test "succeeds when the media limit is positive" do
+      source = source_fixture()
+
+      assert %{errors: []} = Sources.change_source(source, %{media_limit: 5})
+    end
+
+    test "fails when the media limit isn't positive" do
+      source = source_fixture()
+
+      assert %{errors: [_]} = Sources.change_source(source, %{media_limit: 0})
+      assert %{errors: [_]} = Sources.change_source(source, %{media_limit: -1})
+    end
+
+    test "defaults the behaviour to waiting for a free slot" do
+      assert %{media_limit_behaviour: :wait_for_slot} = source_fixture()
+    end
+
+    test "accepts a media limit behaviour" do
+      assert %{errors: []} = Sources.change_source(source_fixture(), %{media_limit_behaviour: :delete_oldest})
+    end
+  end
+
   describe "change_source/3 when testing original_url validation" do
     test "succeeds when an original URL is valid" do
       source = source_fixture()

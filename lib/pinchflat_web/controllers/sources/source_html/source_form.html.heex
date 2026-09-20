@@ -147,6 +147,28 @@
       html_help={true}
     />
 
+    <section x-data={"{ mediaLimit: '#{f[:media_limit].value}' }"}>
+      <.input
+        field={f[:media_limit]}
+        type="number"
+        label="Media Limit"
+        min="1"
+        help="The most media items this source may keep on-disk at once, newest first. Leave blank for no limit"
+        x-model="mediaLimit"
+      />
+
+      <section x-show="!!mediaLimit">
+        <.input
+          field={f[:media_limit_behaviour]}
+          options={friendly_media_limit_behaviours()}
+          type="select"
+          label="When the Media Limit is Reached"
+          help={media_limit_behaviour_help()}
+          html_help={true}
+        />
+      </section>
+    </section>
+
     <section x-show="advancedMode">
       <h3 class="mt-8 text-2xl text-black dark:text-white">
         Advanced Options

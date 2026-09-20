@@ -14,6 +14,7 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
   alias Pinchflat.Repo
   alias Pinchflat.Media
   alias Pinchflat.Media.FileSyncing
+  alias Pinchflat.Media.MediaLimits
   alias Pinchflat.Downloading.MediaDownloader
 
   alias Pinchflat.Lifecycle.UserScripts.CommandRunner, as: UserScriptRunner
@@ -66,12 +67,14 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
     (media_item.source.download_media && !media_item.prevent_download) || should_force
   end
 
-  # If it's not a quality upgrade, additionally check if the media item is pending download
+  # If it's not a quality upgrade, additionally check if the media item is pending download.
+  # This is re-checked here (rather than trusting that it was pending when enqueued) because
+  # jobs can sit in the queue long enough for a source's media limit to fill back up
   defp should_download_media?(media_item, should_force, _is_quality_upgrade) do
     source = media_item.source
-    is_pending = Media.pending_download?(media_item)
+    is_downloadable = MediaLimits.downloadable?(media_item)
 
-    (is_pending && source.download_media && !media_item.prevent_download) || should_force
+    (is_downloadable && source.download_media && !media_item.prevent_download) || should_force
   end
 
   # If a user script exists and, when run, returns a non-zero exit code, prevent this and all future downloads
@@ -101,6 +104,9 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
           })
 
         :ok = FileSyncing.delete_outdated_files(media_item, updated_media_item)
+        # Make room for what we just downloaded. No-op unless the source has a media limit
+        # that deletes old media - see `Pinchflat.Media.MediaLimits`
+        :ok = MediaLimits.enforce_limit_for(media_item.source)
         run_user_script(:media_downloaded, updated_media_item)
 
         :ok

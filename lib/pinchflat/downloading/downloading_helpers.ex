@@ -14,6 +14,7 @@ defmodule Pinchflat.Downloading.DownloadingHelpers do
   alias Pinchflat.Tasks
   alias Pinchflat.Sources.Source
   alias Pinchflat.Media.MediaItem
+  alias Pinchflat.Media.MediaLimits
   alias Pinchflat.Downloading.MediaDownloadWorker
 
   @doc """
@@ -25,13 +26,16 @@ defmodule Pinchflat.Downloading.DownloadingHelpers do
   that any stragglers are caught if, for some reason, they weren't enqueued
   or somehow got de-queued.
 
+  NOTE: if the source has a media limit set, only the media items that fit within
+  that limit are enqueued. See `Pinchflat.Media.MediaLimits`.
+
   Returns :ok
   """
   def enqueue_pending_download_tasks(source, job_opts \\ [])
 
   def enqueue_pending_download_tasks(%Source{download_media: true} = source, job_opts) do
     source
-    |> Media.list_pending_media_items_for()
+    |> MediaLimits.list_downloadable_media_items_for()
     |> Enum.each(&MediaDownloadWorker.kickoff_with_task(&1, %{}, job_opts))
   end
 
@@ -52,15 +56,15 @@ defmodule Pinchflat.Downloading.DownloadingHelpers do
 
   @doc """
   Takes a single media item and enqueues a download job if the media should be
-  downloaded, based on the source's download settings and whether media is
-  considered pending.
+  downloaded, based on the source's download settings, whether media is
+  considered pending, and the source's media limit (if any).
 
   Returns {:ok, %Task{}} | {:error, :should_not_download} | {:error, any()}
   """
   def kickoff_download_if_pending(%MediaItem{} = media_item, job_opts \\ []) do
     media_item = Repo.preload(media_item, :source)
 
-    if media_item.source.download_media && Media.pending_download?(media_item) do
+    if media_item.source.download_media && MediaLimits.downloadable?(media_item) do
       Logger.info("Kicking off download for media item ##{media_item.id} (#{media_item.media_id})")
 
       MediaDownloadWorker.kickoff_with_task(media_item, %{}, job_opts)
