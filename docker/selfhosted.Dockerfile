@@ -27,12 +27,17 @@ RUN apt-get update -y && \
     # Hex and Rebar
     mix local.hex --force && \
     mix local.rebar --force && \
-    # FFmpeg (latest build that doesn't cause an illegal instruction error for some users - see #347)
+    # FFmpeg. The old autobuild-2024-07-30-14-10 pin (chosen to dodge the illegal
+    # instruction crash in #347) no longer exists: yt-dlp/FFmpeg-Builds prunes old
+    # autobuild releases, so that asset 404s and the image cannot be built at all.
+    # The rolling `latest` release keeps a stable filename and cannot disappear.
+    # Checked for #347 on an i5-2415M (AVX, no AVX2/FMA): runs clean.
+    # `curl -f` so a missing asset fails here instead of as a confusing tar error.
     export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
-    "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2024-07-30-14-10/ffmpeg-N-116468-g0e09f6d690-linux64-gpl.tar.xz"   ;; \
-    "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2024-07-30-14-10/ffmpeg-N-116468-g0e09f6d690-linuxarm64-gpl.tar.xz" ;; \
+    "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"   ;; \
+    "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" ;; \
     *)               echo ""        ;; esac) && \
-    curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg.tar.xz && \
+    curl -fL ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg.tar.xz && \
     tar -xf /tmp/ffmpeg.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" && \
     tar -xf /tmp/ffmpeg.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffprobe" && \
     # Cleanup
