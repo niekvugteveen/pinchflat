@@ -21,6 +21,7 @@ defmodule PinchflatWeb.Api.V1.SourceController do
   alias Pinchflat.Sources
   alias Pinchflat.Sources.Source
   alias Pinchflat.Media.MediaQuery
+  alias Pinchflat.Media.MediaLimits
   alias Pinchflat.Profiles.MediaProfile
   alias Pinchflat.Sources.SourceUrlResolver
 
@@ -149,10 +150,15 @@ defmodule PinchflatWeb.Api.V1.SourceController do
     |> render(:detail, source: Repo.preload(source, :media_profile), stats: source_stats(source))
   end
 
-  # `pending_cull_count` is what `MediaRetentionWorker` would delete on its next run given the
-  # source's settings _as they are now_ - so reading it back after an update tells you what the
-  # update is going to cost. It deliberately covers both retention and cutoff-date culling,
-  # because to a caller they are one question: "what no longer fits?"
+  # These counts are what the source's settings _as they are now_ are about to cost, so reading
+  # them back after an update tells you what the update did. They are split by the worker that
+  # acts on them because the two run on different schedules and only one of them is conditional:
+  #
+  #   - `pending_cull_count` covers retention periods and cutoff dates together (to a caller they
+  #     are one question - "what no longer fits?") and is deleted by `MediaRetentionWorker`, daily
+  #     at 01:00.
+  #   - `over_media_limit_count` is deleted by `MediaLimitWorker`, hourly at :15, but *only* when
+  #     `media_limit_behaviour` is `delete_oldest`. Under `wait_for_slot` nothing is deleted.
   defp source_stats(source) do
     %{
       media_items_count: media_count(source, nil),
@@ -161,7 +167,8 @@ defmodule PinchflatWeb.Api.V1.SourceController do
         media_count(
           source,
           dynamic(^MediaQuery.cullable() or ^MediaQuery.deletable_based_on_source_cutoff())
-        )
+        ),
+      over_media_limit_count: MediaLimits.count_over_limit(source)
     }
   end
 

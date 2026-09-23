@@ -318,6 +318,22 @@ defmodule PinchflatWeb.Api.V1.SourceControllerTest do
       assert stats["media_items_count"] == 2
       assert stats["downloaded_media_items_count"] == 2
       assert stats["pending_cull_count"] == 1
+      assert stats["over_media_limit_count"] == 0
+    end
+
+    test "counts the media items that a lowered media limit puts over the window", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source = source_fixture(media_profile_id: media_profile.id, media_limit: 1)
+
+      media_item_fixture(source_id: source.id, uploaded_at: DateTime.add(DateTime.utc_now(), -2, :day))
+      media_item_fixture(source_id: source.id, uploaded_at: DateTime.utc_now())
+
+      conn = conn |> auth_conn(token) |> get(~p"/api/v1/sources/#{source.id}")
+
+      assert %{"stats" => %{"over_media_limit_count" => 1}} = json_response(conn, 200)
     end
 
     test "returns 404 for an unknown id", %{conn: conn, token: token} do

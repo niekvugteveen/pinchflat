@@ -69,6 +69,24 @@ defmodule Pinchflat.Media.MediaLimits do
   end
 
   @doc """
+  How many downloaded media items fall outside the source's download window - ie: how many
+  `enforce_limit_for/1` would delete on its next run.
+
+  Always 0 for a source without a limit. Note that this is only ever _acted_ on when
+  `media_limit_behaviour` is `:delete_oldest`: under `:wait_for_slot` nothing is deleted, the
+  source simply stops downloading until one of its files disappears.
+
+  Returns integer()
+  """
+  def count_over_limit(%Source{} = source) do
+    if limited?(source) do
+      source |> list_media_items_over_limit() |> length()
+    else
+      0
+    end
+  end
+
+  @doc """
   Brings a source back in line with its media limit. What this means depends on the source's
   `media_limit_behaviour` - see the moduledoc. Sources without a limit are left alone.
 
