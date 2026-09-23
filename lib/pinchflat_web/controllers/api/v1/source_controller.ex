@@ -1,12 +1,16 @@
 defmodule PinchflatWeb.Api.V1.SourceController do
   @moduledoc """
-  Creating and listing sources over JSON, for clients that should never see the source form -
-  an iOS share-sheet Shortcut, a Kodi context-menu add-on and an MCP server for the Hermes
-  agents.
+  Reading, creating and updating sources over JSON, for clients that should never see the
+  source form - an iOS share-sheet Shortcut, a Kodi context-menu add-on and an MCP server
+  for the Hermes agents.
 
   Creation is idempotent. A share-sheet button _will_ get double-tapped, so posting the same
   channel to the same media profile twice returns the existing source with `created: false`
   rather than an error.
+
+  There is deliberately no `delete` action. Deleting a source is the one operation whose blast
+  radius is a channel's entire download history, and it stays a thing you do in the UI with a
+  confirmation in front of you.
   """
 
   use PinchflatWeb, :controller
@@ -16,6 +20,7 @@ defmodule PinchflatWeb.Api.V1.SourceController do
   alias Pinchflat.Repo
   alias Pinchflat.Sources
   alias Pinchflat.Sources.Source
+  alias Pinchflat.Media.MediaQuery
   alias Pinchflat.Profiles.MediaProfile
   alias Pinchflat.Sources.SourceUrlResolver
 
@@ -33,6 +38,23 @@ defmodule PinchflatWeb.Api.V1.SourceController do
     retention_period_days
   )
 
+  # What `update` accepts, over and above the create-time passthroughs. Sending an explicit
+  # `null` clears a field (eg: `retention_period_days: null` means "keep forever").
+  #
+  # Three things are deliberately absent. `original_url` because pointing a source at another
+  # channel is not an edit, it is a different source - and it would re-run the expensive yt-dlp
+  # lookup. `media_profile_id` because a profile drives the output path template and moving a
+  # source does not move the files it has already written. `output_path_template_override` for
+  # the same reason. All three are UI operations with the consequences in front of you.
+  @updatable_params @passthrough_params ++
+                      ~w(
+                        enabled
+                        description
+                        cookie_behaviour
+                        min_duration_seconds
+                        max_duration_seconds
+                      )
+
   @doc """
   Lists every source, with its media profile preloaded so clients can show which profile a
   source belongs to without a second request.
@@ -46,6 +68,109 @@ defmodule PinchflatWeb.Api.V1.SourceController do
       |> Enum.sort_by(& &1.custom_name)
 
     render(conn, :index, sources: sources)
+  end
+
+  @doc """
+  Returns one source with every setting it carries, plus a count of its media items and -
+  crucially - how many of the files it currently has on-disk no longer meet its own criteria
+  and are therefore queued to be deleted.
+
+  That last number is the whole reason this action exists. Changing `retention_period_days` or
+  `download_cutoff_date` _does_ delete files that fall outside the new window, but not until
+  `MediaRetentionWorker` runs (daily, 01:00), so a client that only reads back the settings has
+  no way to tell the user what is about to happen.
+
+  Returns a 200 JSON response, or 404 if no source has that id.
+  """
+  def show(conn, %{"id" => id}) do
+    case fetch_source(id) do
+      {:ok, source} -> render_detail(conn, source)
+      {:error, status, payload} -> send_api_error(conn, status, payload)
+    end
+  end
+
+  @doc """
+  Updates a source's settings. Only the fields present in the request are touched; an explicit
+  `null` clears a field.
+
+  Renders the same payload as `show/2`, so the caller can see the effect of the change -
+  including the updated `pending_cull_count`.
+
+  Returns a 200 JSON response, 404 if no source has that id, or 422 if nothing updatable was
+  given or the changeset rejected the values.
+  """
+  def update(conn, %{"id" => id} = params) do
+    with {:ok, source} <- fetch_source(id),
+         {:ok, attrs} <- updatable_attrs(params),
+         {:ok, updated_source} <- update_source(source, attrs) do
+      render_detail(conn, updated_source)
+    else
+      {:error, status, payload} -> send_api_error(conn, status, payload)
+    end
+  end
+
+  defp update_source(source, attrs) do
+    case Sources.update_source(source, attrs) do
+      {:ok, source} ->
+        {:ok, source}
+
+      {:error, changeset} ->
+        {:error, :unprocessable_entity, %{error: "unprocessable_entity", errors: translate_errors(changeset)}}
+    end
+  end
+
+  defp updatable_attrs(params) do
+    case Map.take(params, @updatable_params) do
+      attrs when map_size(attrs) == 0 ->
+        {:error, :unprocessable_entity,
+         %{
+           error: "unprocessable_entity",
+           message: "no updatable fields given",
+           updatable_fields: @updatable_params
+         }}
+
+      attrs ->
+        {:ok, attrs}
+    end
+  end
+
+  defp fetch_source(id) do
+    with {:ok, cast_id} <- cast_id(id),
+         %Source{} = source <- Repo.get(Source, cast_id) do
+      {:ok, source}
+    else
+      _ -> {:error, :not_found, %{error: "not_found", message: "no source with that id"}}
+    end
+  end
+
+  defp render_detail(conn, source) do
+    conn
+    |> put_status(:ok)
+    |> render(:detail, source: Repo.preload(source, :media_profile), stats: source_stats(source))
+  end
+
+  # `pending_cull_count` is what `MediaRetentionWorker` would delete on its next run given the
+  # source's settings _as they are now_ - so reading it back after an update tells you what the
+  # update is going to cost. It deliberately covers both retention and cutoff-date culling,
+  # because to a caller they are one question: "what no longer fits?"
+  defp source_stats(source) do
+    %{
+      media_items_count: media_count(source, nil),
+      downloaded_media_items_count: media_count(source, MediaQuery.downloaded()),
+      pending_cull_count:
+        media_count(
+          source,
+          dynamic(^MediaQuery.cullable() or ^MediaQuery.deletable_based_on_source_cutoff())
+        )
+    }
+  end
+
+  defp media_count(source, condition) do
+    MediaQuery.new()
+    |> MediaQuery.require_assoc(:source)
+    |> where(^MediaQuery.for_source(source))
+    |> then(fn query -> if condition, do: where(query, ^condition), else: query end)
+    |> Repo.aggregate(:count)
   end
 
   @doc """

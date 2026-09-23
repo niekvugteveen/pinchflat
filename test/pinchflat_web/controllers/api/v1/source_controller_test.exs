@@ -1,6 +1,7 @@
 defmodule PinchflatWeb.Api.V1.SourceControllerTest do
   use PinchflatWeb.ConnCase
 
+  import Pinchflat.MediaFixtures
   import Pinchflat.SourcesFixtures
   import Pinchflat.ProfilesFixtures
 
@@ -272,6 +273,160 @@ defmodule PinchflatWeb.Api.V1.SourceControllerTest do
       assert %{"error" => "unprocessable_entity", "errors" => errors} = json_response(conn, 422)
       assert errors["media_limit"]
       assert Repo.aggregate(Source, :count) == 0
+    end
+  end
+
+  describe "show" do
+    test "renders every setting, not just the actionable ones", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source =
+        source_fixture(
+          media_profile_id: media_profile.id,
+          retention_period_days: 30,
+          download_cutoff_date: ~D[2025-01-01],
+          min_duration_seconds: 60
+        )
+
+      conn = conn |> auth_conn(token) |> get(~p"/api/v1/sources/#{source.id}")
+
+      assert %{"source" => rendered} = json_response(conn, 200)
+      assert rendered["id"] == source.id
+      assert rendered["retention_period_days"] == 30
+      assert rendered["download_cutoff_date"] == "2025-01-01"
+      assert rendered["min_duration_seconds"] == 60
+      assert rendered["media_profile_name"] == media_profile.name
+    end
+
+    test "counts the media items that no longer meet the source's criteria", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source = source_fixture(media_profile_id: media_profile.id, retention_period_days: 30)
+
+      # Downloaded 60 days ago, so past a 30-day retention period
+      media_item_fixture(source_id: source.id, media_downloaded_at: DateTime.add(DateTime.utc_now(), -60, :day))
+      # Downloaded today, so well within it
+      media_item_fixture(source_id: source.id, media_downloaded_at: DateTime.utc_now())
+
+      conn = conn |> auth_conn(token) |> get(~p"/api/v1/sources/#{source.id}")
+
+      assert %{"stats" => stats} = json_response(conn, 200)
+      assert stats["media_items_count"] == 2
+      assert stats["downloaded_media_items_count"] == 2
+      assert stats["pending_cull_count"] == 1
+    end
+
+    test "returns 404 for an unknown id", %{conn: conn, token: token} do
+      conn = conn |> auth_conn(token) |> get(~p"/api/v1/sources/123456")
+
+      assert %{"error" => "not_found"} = json_response(conn, 404)
+    end
+
+    test "returns 401 without a token", %{conn: conn, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id)
+      conn = get(conn, ~p"/api/v1/sources/#{source.id}")
+
+      assert json_response(conn, 401) == %{"error" => "unauthorized"}
+    end
+  end
+
+  describe "update" do
+    test "updates only the fields that were sent", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id, media_limit: 5, custom_name: "Keep me")
+
+      conn =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{retention_period_days: 14})
+
+      assert %{"source" => rendered} = json_response(conn, 200)
+      assert rendered["retention_period_days"] == 14
+      assert rendered["media_limit"] == 5
+      assert rendered["custom_name"] == "Keep me"
+    end
+
+    test "clears a field when sent an explicit null", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id, download_cutoff_date: ~D[2025-01-01])
+
+      conn =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{download_cutoff_date: nil})
+
+      assert %{"source" => rendered} = json_response(conn, 200)
+      assert rendered["download_cutoff_date"] == nil
+    end
+
+    test "reports what the new settings are about to delete", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source = source_fixture(media_profile_id: media_profile.id)
+      media_item_fixture(source_id: source.id, media_downloaded_at: DateTime.add(DateTime.utc_now(), -60, :day))
+
+      before = conn |> auth_conn(token) |> get(~p"/api/v1/sources/#{source.id}")
+      assert %{"stats" => %{"pending_cull_count" => 0}} = json_response(before, 200)
+
+      conn =
+        build_conn()
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{retention_period_days: 7})
+
+      assert %{"stats" => %{"pending_cull_count" => 1}} = json_response(conn, 200)
+    end
+
+    test "accepts PUT as well as PATCH", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id)
+
+      conn = conn |> auth_conn(token) |> put(~p"/api/v1/sources/#{source.id}", %{enabled: false})
+
+      assert %{"source" => %{"enabled" => false}} = json_response(conn, 200)
+    end
+
+    test "does not accept fields outside the allowlist", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id)
+      other_profile = media_profile_fixture()
+
+      conn =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{
+          media_profile_id: other_profile.id,
+          original_url: "https://www.youtube.com/@SomewhereElse"
+        })
+
+      assert %{"error" => "unprocessable_entity", "updatable_fields" => fields} = json_response(conn, 422)
+      refute "media_profile_id" in fields
+      refute "original_url" in fields
+
+      reloaded = Repo.reload!(source)
+      assert reloaded.media_profile_id == media_profile.id
+      assert reloaded.original_url == source.original_url
+    end
+
+    test "returns 422 when the changeset rejects an attribute", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source = source_fixture(media_profile_id: media_profile.id, media_limit: 5)
+
+      conn = conn |> auth_conn(token) |> patch(~p"/api/v1/sources/#{source.id}", %{media_limit: 0})
+
+      assert %{"error" => "unprocessable_entity", "errors" => errors} = json_response(conn, 422)
+      assert errors["media_limit"]
+      assert Repo.reload!(source).media_limit == 5
+    end
+
+    test "returns 404 for an unknown id", %{conn: conn, token: token} do
+      conn = conn |> auth_conn(token) |> patch(~p"/api/v1/sources/123456", %{enabled: false})
+
+      assert %{"error" => "not_found"} = json_response(conn, 404)
     end
   end
 end

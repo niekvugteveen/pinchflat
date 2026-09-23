@@ -73,6 +73,11 @@ defmodule PinchflatWeb.Router do
 
     get "/sources", SourceController, :index
     post "/sources", SourceController, :create
+    # `:id` is always an integer, so `strip_trailing_extension` (see the note at the top of
+    # this file) has nothing to bite on here.
+    get "/sources/:id", SourceController, :show
+    patch "/sources/:id", SourceController, :update
+    put "/sources/:id", SourceController, :update
   end
 
   # No auth or CSRF protection for the health check endpoint
