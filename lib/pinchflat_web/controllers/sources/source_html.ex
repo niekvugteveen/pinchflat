@@ -42,6 +42,16 @@ defmodule PinchflatWeb.Sources.SourceHTML do
     ]
   end
 
+  # "Same as media profile" is the select's prompt (an empty value, ie: `nil`) rather than an
+  # option here, since it is the absence of an override and not a behaviour of its own
+  def friendly_sponsorblock_overrides do
+    [
+      {"Disabled", :disabled},
+      {"Mark Segments as Chapters", :mark},
+      {"Remove Segments", :remove}
+    ]
+  end
+
   def cutoff_date_presets do
     [
       {"7 days", compute_date_offset(7)},

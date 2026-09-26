@@ -169,6 +169,30 @@
       </section>
     </section>
 
+    <section x-data={"{ sponsorblockBehaviour: '#{f[:sponsorblock_behaviour].value}' }"}>
+      <.input
+        field={f[:sponsorblock_behaviour]}
+        options={friendly_sponsorblock_overrides()}
+        prompt="Same as media profile (default)"
+        type="select"
+        label="SponsorBlock Behaviour"
+        help="Overrides the media profile's SponsorBlock settings for this source only"
+        x-model="sponsorblockBehaviour"
+      />
+
+      <section x-show="sponsorblockBehaviour === 'mark' || sponsorblockBehaviour === 'remove'" x-transition>
+        <%!-- Submitted even when no box is ticked, so unticking them all is not silently ignored --%>
+        <input type="hidden" name={f[:sponsorblock_categories].name <> "[]"} value="" />
+        <.input
+          field={f[:sponsorblock_categories]}
+          value={f[:sponsorblock_categories].value || []}
+          options={PinchflatWeb.MediaProfiles.MediaProfileHTML.frieldly_sponsorblock_categories()}
+          type="checkbox_group"
+          label="SponsorBlock Categories"
+        />
+      </section>
+    </section>
+
     <section x-show="advancedMode">
       <h3 class="mt-8 text-2xl text-black dark:text-white">
         Advanced Options

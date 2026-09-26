@@ -42,7 +42,14 @@ defmodule Pinchflat.Sources.Source do
     marked_for_deletion_at
     min_duration_seconds
     max_duration_seconds
+    sponsorblock_behaviour
+    sponsorblock_categories
   )a
+
+  # The categories yt-dlp accepts for --sponsorblock-mark/--sponsorblock-remove. Validated here
+  # because an unknown category is not rejected until download time, where it fails every
+  # download of the source instead of the save that introduced it.
+  @sponsorblock_categories ~w(sponsor intro outro selfpromo preview filler interaction music_offtopic)
 
   # Expensive API calls are made when a source is inserted/updated so
   # we want to ensure that the source is valid before making the call.
@@ -97,6 +104,12 @@ defmodule Pinchflat.Sources.Source do
     field :min_duration_seconds, :integer
     field :max_duration_seconds, :integer
 
+    # Overrides the media profile's SponsorBlock settings for this source only. `nil` means
+    # "use the media profile's", so the two fields are only meaningful together - see
+    # `Pinchflat.Downloading.DownloadOptionBuilder`
+    field :sponsorblock_behaviour, Ecto.Enum, values: [:disabled, :mark, :remove]
+    field :sponsorblock_categories, {:array, :string}
+
     field :series_directory, :string
     field :nfo_filepath, :string
     field :poster_filepath, :string
@@ -132,6 +145,7 @@ defmodule Pinchflat.Sources.Source do
     |> validate_required(required_fields)
     |> validate_title_regex()
     |> validate_min_and_max_durations()
+    |> validate_sponsorblock_override()
     |> validate_number(:retention_period_days, greater_than_or_equal_to: 0)
     |> validate_number(:media_limit, greater_than: 0)
     # Ensures it ends with `.{{ ext }}` or `.%(ext)s` or similar (with a little wiggle room)
@@ -187,6 +201,34 @@ defmodule Pinchflat.Sources.Source do
       {min, max} when is_nil(min) or is_nil(max) -> changeset
       {min, max} when min >= max -> add_error(changeset, :max_duration_seconds, "must be greater than minumum duration")
       _ -> changeset
+    end
+  end
+
+  # The override is one setting spread over two fields, so keep them coherent:
+  #   - no behaviour means "use the profile's", which leaves nothing for categories to do
+  #   - mark/remove without categories would silently do nothing, since yt-dlp is only given
+  #     a SponsorBlock option when there is at least one category
+  # Blank entries are dropped because a form's checkbox group submits one for "none ticked".
+  defp validate_sponsorblock_override(changeset) do
+    categories =
+      changeset
+      |> get_field(:sponsorblock_categories)
+      |> Kernel.||([])
+      |> Enum.reject(&(&1 in [nil, ""]))
+
+    case get_field(changeset, :sponsorblock_behaviour) do
+      nil ->
+        put_change(changeset, :sponsorblock_categories, nil)
+
+      behaviour when behaviour in [:mark, :remove] and categories == [] ->
+        changeset
+        |> put_change(:sponsorblock_categories, [])
+        |> add_error(:sponsorblock_categories, "must include at least one category to #{behaviour}")
+
+      _ ->
+        changeset
+        |> put_change(:sponsorblock_categories, categories)
+        |> validate_subset(:sponsorblock_categories, @sponsorblock_categories)
     end
   end
 

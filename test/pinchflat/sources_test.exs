@@ -966,6 +966,49 @@ defmodule Pinchflat.SourcesTest do
     end
   end
 
+  describe "change_source/3 when testing sponsorblock override validation" do
+    test "succeeds with no override, and clears any categories" do
+      source = source_fixture()
+
+      changeset = Sources.change_source(source, %{sponsorblock_behaviour: nil, sponsorblock_categories: ["sponsor"]})
+
+      assert changeset.errors == []
+      assert Ecto.Changeset.get_field(changeset, :sponsorblock_categories) == nil
+    end
+
+    test "succeeds with a behaviour and known categories, dropping blank entries" do
+      source = source_fixture()
+
+      changeset =
+        Sources.change_source(source, %{sponsorblock_behaviour: :remove, sponsorblock_categories: ["", "sponsor"]})
+
+      assert changeset.errors == []
+      assert Ecto.Changeset.get_field(changeset, :sponsorblock_categories) == ["sponsor"]
+    end
+
+    test "succeeds when disabling without categories" do
+      source = source_fixture()
+
+      assert %{errors: []} = Sources.change_source(source, %{sponsorblock_behaviour: :disabled})
+    end
+
+    test "fails when marking or removing without categories" do
+      source = source_fixture()
+
+      changeset = Sources.change_source(source, %{sponsorblock_behaviour: :remove, sponsorblock_categories: [""]})
+
+      assert "must include at least one category to remove" in errors_on(changeset).sponsorblock_categories
+    end
+
+    test "fails with an unknown category" do
+      source = source_fixture()
+
+      changeset = Sources.change_source(source, %{sponsorblock_behaviour: :mark, sponsorblock_categories: ["sponsors"]})
+
+      assert "has an invalid entry" in errors_on(changeset).sponsorblock_categories
+    end
+  end
+
   describe "change_source/3 when testing media limit validation" do
     test "succeeds when the media limit is blank" do
       source = source_fixture()

@@ -68,6 +68,9 @@ defmodule PinchflatWeb.Api.V1.SourceJSON do
       title_filter_regex: source.title_filter_regex,
       min_duration_seconds: source.min_duration_seconds,
       max_duration_seconds: source.max_duration_seconds,
+      # `nil` behaviour means the media profile's SponsorBlock settings apply
+      sponsorblock_behaviour: source.sponsorblock_behaviour,
+      sponsorblock_categories: source.sponsorblock_categories,
       series_directory: source.series_directory,
       output_path_template_override: source.output_path_template_override,
       marked_for_deletion_at: source.marked_for_deletion_at,

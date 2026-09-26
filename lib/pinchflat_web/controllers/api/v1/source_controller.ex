@@ -37,6 +37,8 @@ defmodule PinchflatWeb.Api.V1.SourceController do
     title_filter_regex
     download_cutoff_date
     retention_period_days
+    sponsorblock_behaviour
+    sponsorblock_categories
   )
 
   # What `update` accepts, over and above the create-time passthroughs. Sending an explicit

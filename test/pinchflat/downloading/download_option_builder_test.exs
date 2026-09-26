@@ -327,6 +327,46 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
     end
   end
 
+  describe "build/1 when testing source sponsorblock overrides" do
+    setup %{media_item: media_item} do
+      media_item =
+        update_media_profile_attribute(media_item, %{
+          sponsorblock_behaviour: :remove,
+          sponsorblock_categories: ["sponsor"]
+        })
+
+      {:ok, media_item: media_item}
+    end
+
+    test "uses the media profile's settings when the source has no override", %{media_item: media_item} do
+      assert {:ok, res} = DownloadOptionBuilder.build(media_item)
+
+      assert {:sponsorblock_remove, "sponsor"} in res
+    end
+
+    test "uses the source's behaviour and categories when set", %{media_item: media_item} do
+      media_item =
+        update_source_attribute(media_item, %{
+          sponsorblock_behaviour: :mark,
+          sponsorblock_categories: ["intro", "outro"]
+        })
+
+      assert {:ok, res} = DownloadOptionBuilder.build(media_item)
+
+      assert {:sponsorblock_mark, "intro,outro"} in res
+      refute Keyword.has_key?(res, :sponsorblock_remove)
+    end
+
+    test "lets a source disable sponsorblock that its profile enables", %{media_item: media_item} do
+      media_item = update_source_attribute(media_item, %{sponsorblock_behaviour: :disabled})
+
+      assert {:ok, res} = DownloadOptionBuilder.build(media_item)
+
+      refute Keyword.has_key?(res, :sponsorblock_remove)
+      refute Keyword.has_key?(res, :sponsorblock_mark)
+    end
+  end
+
   describe "build/1 when testing config file options" do
     setup do
       base_dir = Path.join(Application.get_env(:pinchflat, :extras_directory), "yt-dlp-configs")
@@ -454,6 +494,14 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
       assert {:format_sort, "res:1080,+codec:avc:m4a"} in options
       assert {:remux_video, "mp4"} in options
     end
+  end
+
+  defp update_source_attribute(media_item_with_preloads, attrs) do
+    {:ok, _} = Sources.update_source(media_item_with_preloads.source, attrs)
+
+    media_item_with_preloads
+    |> Repo.reload()
+    |> Repo.preload([source: :media_profile], force: true)
   end
 
   defp update_media_profile_attribute(media_item_with_preloads, attrs) do

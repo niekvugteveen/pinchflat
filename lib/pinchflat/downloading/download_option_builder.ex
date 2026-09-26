@@ -25,7 +25,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilder do
         thumbnail_options(media_item_with_preloads) ++
         metadata_options(media_profile) ++
         quality_options(media_profile) ++
-        sponsorblock_options(media_profile) ++
+        sponsorblock_options(media_item_with_preloads.source) ++
         output_options(media_item_with_preloads) ++
         config_file_options(media_item_with_preloads)
 
@@ -145,10 +145,17 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilder do
     QualityOptionBuilder.build(media_profile)
   end
 
-  defp sponsorblock_options(media_profile) do
-    categories = media_profile.sponsorblock_categories
-    behaviour = media_profile.sponsorblock_behaviour
+  # A source's own SponsorBlock settings win over its media profile's, but only as a pair:
+  # a source with no behaviour set uses the profile's behaviour _and_ categories.
+  defp sponsorblock_options(%Source{sponsorblock_behaviour: nil, media_profile: media_profile}) do
+    build_sponsorblock_options(media_profile.sponsorblock_behaviour, media_profile.sponsorblock_categories)
+  end
 
+  defp sponsorblock_options(%Source{} = source) do
+    build_sponsorblock_options(source.sponsorblock_behaviour, source.sponsorblock_categories || [])
+  end
+
+  defp build_sponsorblock_options(behaviour, categories) do
     case {behaviour, categories} do
       {_, []} -> []
       {:remove, _} -> [sponsorblock_remove: Enum.join(categories, ",")]

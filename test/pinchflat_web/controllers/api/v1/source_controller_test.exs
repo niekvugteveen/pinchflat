@@ -377,6 +377,46 @@ defmodule PinchflatWeb.Api.V1.SourceControllerTest do
       assert rendered["download_cutoff_date"] == nil
     end
 
+    test "sets and clears a sponsorblock override", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id)
+
+      set =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{
+          sponsorblock_behaviour: "remove",
+          sponsorblock_categories: ["sponsor", "selfpromo"]
+        })
+
+      assert %{"source" => rendered} = json_response(set, 200)
+      assert rendered["sponsorblock_behaviour"] == "remove"
+      assert rendered["sponsorblock_categories"] == ["sponsor", "selfpromo"]
+
+      cleared =
+        build_conn()
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{sponsorblock_behaviour: nil})
+
+      assert %{"source" => rendered} = json_response(cleared, 200)
+      assert rendered["sponsorblock_behaviour"] == nil
+      assert rendered["sponsorblock_categories"] == nil
+    end
+
+    test "rejects a sponsorblock override without categories", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source = source_fixture(media_profile_id: media_profile.id)
+
+      conn =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{sponsorblock_behaviour: "mark"})
+
+      assert %{"errors" => %{"sponsorblock_categories" => [_]}} = json_response(conn, 422)
+    end
+
     test "reports what the new settings are about to delete", %{
       conn: conn,
       token: token,
