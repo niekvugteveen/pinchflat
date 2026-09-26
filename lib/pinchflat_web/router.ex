@@ -78,6 +78,8 @@ defmodule PinchflatWeb.Router do
     get "/sources/:id", SourceController, :show
     patch "/sources/:id", SourceController, :update
     put "/sources/:id", SourceController, :update
+
+    get "/sources/:source_id/media_items", MediaItemController, :index
   end
 
   # No auth or CSRF protection for the health check endpoint
