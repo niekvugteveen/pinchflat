@@ -118,7 +118,7 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
         {:ok, :non_retry}
 
       {:error, _error_atom, message} ->
-        action_on_error(message)
+        action_on_error(media_item, message)
     end
   end
 
@@ -132,21 +132,37 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
   defp get_redownloaded_at(true), do: DateTime.utc_now()
   defp get_redownloaded_at(_), do: nil
 
-  defp action_on_error(message) do
+  # Members-only media is marked `prevent_download` rather than left pending. A pending item
+  # counts towards its source's media limit (see `Pinchflat.Media.MediaLimits`), so an item
+  # that can never download would hold one of the source's slots forever. The flag can be
+  # cleared per media item in the UI, eg: for a members-first video that later went public.
+  @members_only_error "This video is available to this channel's members"
+
+  defp action_on_error(media_item, message) do
     # This will attempt re-download at the next indexing, but it won't be retried
     # immediately as part of job failure logic
     non_retryable_errors = [
       "Video unavailable",
       "Sign in to confirm",
-      "This video is available to this channel's members"
+      @members_only_error
     ]
 
-    if String.contains?(to_string(message), non_retryable_errors) do
-      Logger.error("yt-dlp download will not be retried: #{inspect(message)}")
+    message = to_string(message)
 
-      {:ok, :non_retry}
-    else
-      {:error, :download_failed}
+    cond do
+      String.contains?(message, @members_only_error) ->
+        Logger.error("yt-dlp download is members-only, preventing future downloads: #{inspect(message)}")
+        {:ok, _} = Media.update_media_item(media_item, %{prevent_download: true})
+
+        {:ok, :non_retry}
+
+      String.contains?(message, non_retryable_errors) ->
+        Logger.error("yt-dlp download will not be retried: #{inspect(message)}")
+
+        {:ok, :non_retry}
+
+      true ->
+        {:error, :download_failed}
     end
   end
 

@@ -163,6 +163,32 @@ defmodule Pinchflat.Downloading.MediaDownloadWorkerTest do
       end)
     end
 
+    test "prevents future downloads of members-only media", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 2, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl ->
+          {:ok, "{}"}
+
+        _url, :download, _opts, _ot, _addl ->
+          {:error, "This video is available to this channel's members on level: foo", 1}
+      end)
+
+      refute media_item.prevent_download
+      perform_job(MediaDownloadWorker, %{id: media_item.id})
+
+      assert Repo.reload!(media_item).prevent_download
+    end
+
+    test "does not prevent future downloads for other non-retryable errors", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 2, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl -> {:ok, "{}"}
+        _url, :download, _opts, _ot, _addl -> {:error, "Sign in to confirm you're not a bot", 1}
+      end)
+
+      perform_job(MediaDownloadWorker, %{id: media_item.id})
+
+      refute Repo.reload!(media_item).prevent_download
+    end
+
     test "ensures error are returned in a 2-item tuple", %{media_item: media_item} do
       expect(YtDlpRunnerMock, :run, 2, fn
         _url, :get_downloadable_status, _opts, _ot, _addl -> {:ok, "{}"}
