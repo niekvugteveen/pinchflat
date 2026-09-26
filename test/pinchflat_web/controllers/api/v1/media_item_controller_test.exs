@@ -61,6 +61,26 @@ defmodule PinchflatWeb.Api.V1.MediaItemControllerTest do
       assert [%{"title" => "100% bitcoin"}] = json_response(conn, 200)["media_items"]
     end
 
+    test "can exclude or select shorts before applying the limit", %{conn: conn, token: token, source: source} do
+      episode =
+        media_item_fixture(source_id: source.id, short_form_content: false, uploaded_at: ~U[2026-01-01 00:00:00Z])
+
+      short = media_item_fixture(source_id: source.id, short_form_content: true, uploaded_at: ~U[2026-02-01 00:00:00Z])
+
+      path = ~p"/api/v1/sources/#{source.id}/media_items"
+
+      conn = conn |> auth_conn(token) |> get(path, %{shorts: "exclude", limit: "1"})
+      assert [%{"id" => id}] = json_response(conn, 200)["media_items"]
+      assert id == episode.id
+
+      conn = build_conn() |> auth_conn(token) |> get(path, %{shorts: "only"})
+      assert [%{"id" => id}] = json_response(conn, 200)["media_items"]
+      assert id == short.id
+
+      conn = build_conn() |> auth_conn(token) |> get(path)
+      assert length(json_response(conn, 200)["media_items"]) == 2
+    end
+
     test "respects and caps the limit", %{conn: conn, token: token, source: source} do
       for _ <- 1..3, do: media_item_fixture(source_id: source.id)
 

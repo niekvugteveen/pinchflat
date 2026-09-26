@@ -20,8 +20,8 @@ defmodule PinchflatWeb.Api.V1.MediaItemController do
   @max_limit 100
 
   @doc """
-  Params: `limit` (default #{@default_limit}, max #{@max_limit}) and `q`, a case-insensitive
-  substring of the title.
+  Params: `limit` (default #{@default_limit}, max #{@max_limit}), `q`, a case-insensitive
+  substring of the title, and `shorts`: `include` (default), `exclude` or `only`.
 
   Returns a 200 JSON response, 404 if no source has that id, or 422 for an unusable `limit`.
   """
@@ -32,6 +32,7 @@ defmodule PinchflatWeb.Api.V1.MediaItemController do
         MediaItem
         |> where([mi], mi.source_id == ^source.id)
         |> filter_title(params["q"])
+        |> filter_shorts(params["shorts"])
         |> order_by([mi], desc: mi.uploaded_at, desc: mi.id)
         |> limit(^limit)
         |> Repo.all()
@@ -52,6 +53,11 @@ defmodule PinchflatWeb.Api.V1.MediaItemController do
   end
 
   defp filter_title(query, _term), do: query
+
+  # Applied before the limit, so "the newest 5 that are not shorts" is really five items
+  defp filter_shorts(query, "exclude"), do: where(query, [mi], mi.short_form_content == false)
+  defp filter_shorts(query, "only"), do: where(query, [mi], mi.short_form_content == true)
+  defp filter_shorts(query, _include), do: query
 
   defp escape_like(term) do
     String.replace(term, ["\\", "%", "_"], fn char -> "\\" <> char end)
