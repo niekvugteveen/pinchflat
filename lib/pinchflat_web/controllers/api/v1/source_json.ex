@@ -64,6 +64,7 @@ defmodule PinchflatWeb.Api.V1.SourceJSON do
       # Both of these delete already-downloaded files that fall outside them - see
       # `Pinchflat.Downloading.MediaRetentionWorker`
       download_cutoff_date: source.download_cutoff_date,
+      max_age_days: source.max_age_days,
       retention_period_days: source.retention_period_days,
       # Deleted by `Pinchflat.Downloading.WatchedMediaWorker` once Jellyfin reports it as watched
       delete_watched_media: source.delete_watched_media,

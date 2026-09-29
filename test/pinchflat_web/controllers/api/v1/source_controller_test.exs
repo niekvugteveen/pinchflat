@@ -377,6 +377,41 @@ defmodule PinchflatWeb.Api.V1.SourceControllerTest do
       assert rendered["download_cutoff_date"] == nil
     end
 
+    test "sets and clears a max age, reporting what it is about to delete", %{
+      conn: conn,
+      token: token,
+      media_profile: media_profile
+    } do
+      source = source_fixture(media_profile_id: media_profile.id)
+      media_item_with_attachments(%{source_id: source.id, uploaded_at: now_minus(10, :days)})
+
+      set =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{max_age_days: 5})
+
+      assert %{"source" => %{"max_age_days" => 5}, "stats" => %{"pending_cull_count" => 1}} = json_response(set, 200)
+
+      cleared =
+        build_conn()
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{max_age_days: nil})
+
+      assert %{"source" => %{"max_age_days" => nil}, "stats" => %{"pending_cull_count" => 0}} =
+               json_response(cleared, 200)
+    end
+
+    test "rejects a max age of zero", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id)
+
+      conn =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{max_age_days: 0})
+
+      assert %{"errors" => %{"max_age_days" => _}} = json_response(conn, 422)
+    end
+
     test "turns deleting watched media on and off", %{conn: conn, token: token, media_profile: media_profile} do
       source = source_fixture(media_profile_id: media_profile.id)
       refute source.delete_watched_media

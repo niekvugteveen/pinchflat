@@ -58,7 +58,7 @@ defmodule Pinchflat.Downloading.MediaRetentionWorker do
       |> where(^MediaQuery.deletable_based_on_source_cutoff())
       |> Repo.all()
 
-    Logger.info("Deleting #{length(deletable_media)} media items that are from before the source cutoff")
+    Logger.info("Deleting #{length(deletable_media)} media items from before the source cutoff or past its max age")
 
     Enum.each(deletable_media, fn media_item ->
       # Note that I'm not setting `prevent_download` on the media_item here.

@@ -36,6 +36,7 @@ defmodule PinchflatWeb.Api.V1.SourceController do
     media_limit_behaviour
     title_filter_regex
     download_cutoff_date
+    max_age_days
     retention_period_days
     delete_watched_media
     sponsorblock_behaviour

@@ -44,6 +44,15 @@ defmodule Pinchflat.Media.MediaQuery do
     )
   end
 
+  # Same idea as the cutoff date, but relative to today. Day granularity, like the cutoff
+  def upload_date_within_source_max_age do
+    dynamic(
+      [mi, source],
+      is_nil(source.max_age_days) or
+        fragment("date(?) >= date('now', '-' || ? || ' days')", mi.uploaded_at, source.max_age_days)
+    )
+  end
+
   def format_matching_profile_preference do
     dynamic(
       [mi, source, media_profile],
@@ -119,7 +128,7 @@ defmodule Pinchflat.Media.MediaQuery do
     dynamic(
       [mi, source],
       ^downloaded() and
-        not (^upload_date_after_source_cutoff()) and
+        not (^upload_date_after_source_cutoff() and ^upload_date_within_source_max_age()) and
         not (^culling_prevented())
     )
   end
@@ -133,6 +142,7 @@ defmodule Pinchflat.Media.MediaQuery do
       [mi],
       not (^download_prevented()) and
         ^upload_date_after_source_cutoff() and
+        ^upload_date_within_source_max_age() and
         ^format_matching_profile_preference() and
         ^matches_source_title_regex() and
         ^meets_min_and_max_duration()

@@ -139,6 +139,15 @@
     </section>
 
     <.input
+      field={f[:max_age_days]}
+      type="number"
+      label="Maximum Age (days)"
+      min="1"
+      help="Only keep media <em>published</em> in the last this-many days: a cutoff date that moves along. Older media is deleted in the nightly sweep. Leave blank for no maximum age"
+      html_help={true}
+    />
+
+    <.input
       field={f[:retention_period_days]}
       type="number"
       label="Retention Period (days)"

@@ -335,6 +335,28 @@ defmodule Pinchflat.MediaTest do
     end
   end
 
+  describe "list_pending_media_items_for/1 when testing max age" do
+    test "does not return media items published longer ago than the max age" do
+      source = source_fixture(%{max_age_days: 2})
+
+      _old_media_item =
+        media_item_fixture(%{source_id: source.id, media_filepath: nil, uploaded_at: now_minus(3, :days)})
+
+      new_media_item = media_item_fixture(%{source_id: source.id, media_filepath: nil, uploaded_at: now_minus(1, :day)})
+
+      assert Media.list_pending_media_items_for(source) == [new_media_item]
+    end
+
+    test "does not apply a max age if there is none" do
+      source = source_fixture(%{max_age_days: nil})
+
+      old_media_item =
+        media_item_fixture(%{source_id: source.id, media_filepath: nil, uploaded_at: now_minus(300, :days)})
+
+      assert Media.list_pending_media_items_for(source) == [old_media_item]
+    end
+  end
+
   describe "list_pending_media_items_for/1 when testing title regex" do
     test "returns only media items that match the title regex" do
       source = source_fixture(%{title_filter_regex: "(?i)^FOO$"})

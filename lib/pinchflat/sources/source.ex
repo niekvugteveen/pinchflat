@@ -45,6 +45,7 @@ defmodule Pinchflat.Sources.Source do
     sponsorblock_behaviour
     sponsorblock_categories
     delete_watched_media
+    max_age_days
   )a
 
   # The categories yt-dlp accepts for --sponsorblock-mark/--sponsorblock-remove. Validated here
@@ -93,6 +94,10 @@ defmodule Pinchflat.Sources.Source do
     field :last_indexed_at, :utc_datetime
     # Only download media items that were published after this date
     field :download_cutoff_date, :date
+    # A cutoff date that moves along: only keep media published in the last N days. Unlike
+    # `retention_period_days` this counts from the upload date, not the download date, so media
+    # downloaded late (eg: to fill a media limit slot) doesn't get a fresh lease on life
+    field :max_age_days, :integer
     field :retention_period_days, :integer
     # The maximum number of media items this source may keep on-disk at once.
     # `nil` (or 0) means no limit. See `Pinchflat.Media.MediaLimits` for how this is enforced
@@ -151,6 +156,7 @@ defmodule Pinchflat.Sources.Source do
     |> validate_min_and_max_durations()
     |> validate_sponsorblock_override()
     |> validate_number(:retention_period_days, greater_than_or_equal_to: 0)
+    |> validate_number(:max_age_days, greater_than: 0)
     |> validate_number(:media_limit, greater_than: 0)
     # Ensures it ends with `.{{ ext }}` or `.%(ext)s` or similar (with a little wiggle room)
     |> validate_format(:output_path_template_override, MediaProfile.ext_regex(), message: "must end with .{{ ext }}")

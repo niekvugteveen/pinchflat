@@ -111,6 +111,39 @@ defmodule Pinchflat.Downloading.MediaRetentionWorkerTest do
     end
   end
 
+  describe "perform/1 when testing max age-based culling" do
+    test "culls media published longer ago than the max age, however recently it was downloaded" do
+      source = source_fixture(%{max_age_days: 2})
+
+      old_media_item =
+        media_item_with_attachments(%{
+          source_id: source.id,
+          uploaded_at: now_minus(3, :days),
+          media_downloaded_at: now()
+        })
+
+      new_media_item = media_item_with_attachments(%{source_id: source.id, uploaded_at: now_minus(1, :day)})
+
+      perform_job(MediaRetentionWorker, %{})
+
+      assert File.exists?(new_media_item.media_filepath)
+      refute File.exists?(old_media_item.media_filepath)
+      # Same as a cutoff date: raising the max age brings it back
+      refute Repo.reload!(old_media_item).prevent_download
+    end
+
+    test "respects prevent_culling" do
+      source = source_fixture(%{max_age_days: 2})
+
+      old_media_item =
+        media_item_with_attachments(%{source_id: source.id, uploaded_at: now_minus(3, :days), prevent_culling: true})
+
+      perform_job(MediaRetentionWorker, %{})
+
+      assert File.exists?(old_media_item.media_filepath)
+    end
+  end
+
   describe "perform/1 when testing source cutoff-based culling" do
     test "culls media from before the cutoff date" do
       {_source, old_media_item, new_media_item} = prepare_records_for_source_cutoff_date()
