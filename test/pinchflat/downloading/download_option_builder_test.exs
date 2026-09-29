@@ -297,7 +297,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
       assert :force_keyframes_at_cuts in res
-      assert {:postprocessor_args, "ModifyChapters+ffmpeg_o:-preset veryfast"} in res
+      assert {:postprocessor_args, "ModifyChapters+ffmpeg_o:-preset veryfast -threads 2"} in res
     end
 
     test "doesn't re-encode when only marking", %{media_item: media_item} do

@@ -164,7 +164,11 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilder do
   # quicker for a slightly bigger file. It goes to both of ModifyChapters' ffmpeg runs, but only
   # the re-encode uses it: the cut itself is a stream copy, where a preset is ignored. Only
   # media that actually has segments to remove gets re-encoded.
-  @sponsorblock_remove_ffmpeg_args "ModifyChapters+ffmpeg_o:-preset veryfast"
+  #
+  # `-threads 2` because x264 otherwise starts ~30 threads per encode. On a small box running
+  # two downloads at once that is a load average of 15 for a CPU that is merely busy - and a
+  # container CPU limit doesn't help, since throttled threads still count as runnable.
+  @sponsorblock_remove_ffmpeg_args "ModifyChapters+ffmpeg_o:-preset veryfast -threads 2"
 
   defp build_sponsorblock_options(behaviour, categories) do
     case {behaviour, categories} do
