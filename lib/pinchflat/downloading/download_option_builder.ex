@@ -155,12 +155,35 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilder do
     build_sponsorblock_options(source.sponsorblock_behaviour, source.sponsorblock_categories || [])
   end
 
+  # Removing segments needs `force_keyframes_at_cuts`. Without it yt-dlp cuts with stream copy:
+  # audio is cut exactly, but video can only start at a keyframe, so every cut leaves the video
+  # up to a keyframe interval (5s on YouTube) behind the audio - and the offsets add up.
+  #
+  # Forcing keyframes re-encodes the whole video, which is slow on weak hardware - ffmpeg's
+  # default x264 preset took 3x the video's length on a Sandy Bridge i5. `veryfast` is ~2.5x
+  # quicker for a slightly bigger file. It goes to both of ModifyChapters' ffmpeg runs, but only
+  # the re-encode uses it: the cut itself is a stream copy, where a preset is ignored. Only
+  # media that actually has segments to remove gets re-encoded.
+  @sponsorblock_remove_ffmpeg_args "ModifyChapters+ffmpeg_o:-preset veryfast"
+
   defp build_sponsorblock_options(behaviour, categories) do
     case {behaviour, categories} do
-      {_, []} -> []
-      {:remove, _} -> [sponsorblock_remove: Enum.join(categories, ",")]
-      {:mark, _} -> [sponsorblock_mark: Enum.join(categories, ",")]
-      {:disabled, _} -> []
+      {_, []} ->
+        []
+
+      {:remove, _} ->
+        # A bare atom is a flag; `force_keyframes_at_cuts: true` would pass "true" as an argument
+        [
+          {:sponsorblock_remove, Enum.join(categories, ",")},
+          :force_keyframes_at_cuts,
+          {:postprocessor_args, @sponsorblock_remove_ffmpeg_args}
+        ]
+
+      {:mark, _} ->
+        [sponsorblock_mark: Enum.join(categories, ",")]
+
+      {:disabled, _} ->
+        []
     end
   end
 

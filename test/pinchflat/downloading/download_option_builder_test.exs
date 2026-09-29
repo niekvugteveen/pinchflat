@@ -287,6 +287,32 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
       assert {:sponsorblock_remove, "sponsor,intro"} in res
     end
 
+    test "forces keyframes at the cuts when removing, so audio and video stay in sync", %{media_item: media_item} do
+      media_item =
+        update_media_profile_attribute(media_item, %{
+          sponsorblock_behaviour: :remove,
+          sponsorblock_categories: ["sponsor"]
+        })
+
+      assert {:ok, res} = DownloadOptionBuilder.build(media_item)
+
+      assert :force_keyframes_at_cuts in res
+      assert {:postprocessor_args, "ModifyChapters+ffmpeg_o:-preset veryfast"} in res
+    end
+
+    test "doesn't re-encode when only marking", %{media_item: media_item} do
+      media_item =
+        update_media_profile_attribute(media_item, %{
+          sponsorblock_behaviour: :mark,
+          sponsorblock_categories: ["sponsor"]
+        })
+
+      assert {:ok, res} = DownloadOptionBuilder.build(media_item)
+
+      refute :force_keyframes_at_cuts in res
+      refute Keyword.has_key?(res, :postprocessor_args)
+    end
+
     test "includes :sponsorblock_mark option when specified", %{media_item: media_item} do
       media_item =
         update_media_profile_attribute(media_item, %{
