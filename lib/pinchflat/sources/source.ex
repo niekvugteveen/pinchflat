@@ -44,6 +44,7 @@ defmodule Pinchflat.Sources.Source do
     max_duration_seconds
     sponsorblock_behaviour
     sponsorblock_categories
+    delete_watched_media
   )a
 
   # The categories yt-dlp accepts for --sponsorblock-mark/--sponsorblock-remove. Validated here
@@ -97,6 +98,9 @@ defmodule Pinchflat.Sources.Source do
     # `nil` (or 0) means no limit. See `Pinchflat.Media.MediaLimits` for how this is enforced
     field :media_limit, :integer
     field :media_limit_behaviour, Ecto.Enum, values: [:wait_for_slot, :delete_oldest], default: :wait_for_slot
+    # Delete media once a media server reports it as watched, and never download it again.
+    # See `Pinchflat.Downloading.WatchedMediaWorker`
+    field :delete_watched_media, :boolean, default: false
     field :original_url, :string
     field :title_filter_regex, :string
     field :output_path_template_override, :string

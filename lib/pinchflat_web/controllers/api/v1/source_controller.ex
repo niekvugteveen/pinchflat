@@ -37,6 +37,7 @@ defmodule PinchflatWeb.Api.V1.SourceController do
     title_filter_regex
     download_cutoff_date
     retention_period_days
+    delete_watched_media
     sponsorblock_behaviour
     sponsorblock_categories
   )

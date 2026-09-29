@@ -169,6 +169,13 @@
       </section>
     </section>
 
+    <.input
+      field={f[:delete_watched_media]}
+      type="toggle"
+      label="Delete Media Once Watched"
+      help="Deletes media once your media server (Jellyfin) reports it as watched, and never downloads it again. Combined with a media limit this keeps the newest media you haven't seen yet. Requires JELLYFIN_URL and JELLYFIN_API_KEY"
+    />
+
     <section x-data={"{ sponsorblockBehaviour: '#{f[:sponsorblock_behaviour].value}' }"}>
       <.input
         field={f[:sponsorblock_behaviour]}

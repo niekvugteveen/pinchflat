@@ -25,6 +25,18 @@ config :pinchflat,
   basic_auth_username: System.get_env("BASIC_AUTH_USERNAME"),
   basic_auth_password: System.get_env("BASIC_AUTH_PASSWORD")
 
+# Where `delete_watched_media` sources learn what has been watched. See
+# `Pinchflat.MediaServers.Jellyfin` for what each of these means
+if config_env() != :test do
+  {watched_grace_hours, _} = Integer.parse(System.get_env("WATCHED_GRACE_HOURS", "12"))
+
+  config :pinchflat,
+    jellyfin_url: System.get_env("JELLYFIN_URL"),
+    jellyfin_api_key: System.get_env("JELLYFIN_API_KEY"),
+    jellyfin_media_path: System.get_env("JELLYFIN_MEDIA_PATH"),
+    watched_grace_hours: watched_grace_hours
+end
+
 arch_string = to_string(:erlang.system_info(:system_architecture))
 
 system_arch =
@@ -66,7 +78,8 @@ config :pinchflat, Oban,
        {"#{current_minute} #{current_hour} * * *", Pinchflat.YtDlp.UpdateWorker},
        {"0 1 * * *", Pinchflat.Downloading.MediaRetentionWorker},
        {"0 2 * * *", Pinchflat.Downloading.MediaQualityUpgradeWorker},
-       {"15 * * * *", Pinchflat.Downloading.MediaLimitWorker}
+       {"15 * * * *", Pinchflat.Downloading.MediaLimitWorker},
+       {"5 * * * *", Pinchflat.Downloading.WatchedMediaWorker}
      ]}
   ]
 

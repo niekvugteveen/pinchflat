@@ -377,6 +377,25 @@ defmodule PinchflatWeb.Api.V1.SourceControllerTest do
       assert rendered["download_cutoff_date"] == nil
     end
 
+    test "turns deleting watched media on and off", %{conn: conn, token: token, media_profile: media_profile} do
+      source = source_fixture(media_profile_id: media_profile.id)
+      refute source.delete_watched_media
+
+      on =
+        conn
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{delete_watched_media: true})
+
+      assert %{"source" => %{"delete_watched_media" => true}} = json_response(on, 200)
+
+      off =
+        build_conn()
+        |> auth_conn(token)
+        |> patch(~p"/api/v1/sources/#{source.id}", %{delete_watched_media: false})
+
+      assert %{"source" => %{"delete_watched_media" => false}} = json_response(off, 200)
+    end
+
     test "sets and clears a sponsorblock override", %{conn: conn, token: token, media_profile: media_profile} do
       source = source_fixture(media_profile_id: media_profile.id)
 

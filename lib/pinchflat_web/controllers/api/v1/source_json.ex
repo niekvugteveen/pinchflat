@@ -65,6 +65,8 @@ defmodule PinchflatWeb.Api.V1.SourceJSON do
       # `Pinchflat.Downloading.MediaRetentionWorker`
       download_cutoff_date: source.download_cutoff_date,
       retention_period_days: source.retention_period_days,
+      # Deleted by `Pinchflat.Downloading.WatchedMediaWorker` once Jellyfin reports it as watched
+      delete_watched_media: source.delete_watched_media,
       title_filter_regex: source.title_filter_regex,
       min_duration_seconds: source.min_duration_seconds,
       max_duration_seconds: source.max_duration_seconds,
