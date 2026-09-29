@@ -1,6 +1,7 @@
 defmodule Pinchflat.Media.DiskAudit do
   @moduledoc """
-  Finds files on disk that shouldn't be there any more, for an external check to report on.
+  Finds files on disk that shouldn't be there any more. `Pinchflat.Media.DiskCleanupWorker` deletes
+  them nightly; `report/1` is also handy on its own over `bin/pinchflat rpc`.
 
   Two kinds:
 
@@ -86,6 +87,7 @@ defmodule Pinchflat.Media.DiskAudit do
 
       %{
         id: media_item.id,
+        source_id: media_item.source_id,
         source: media_item.source.custom_name,
         title: media_item.title,
         uploaded_at: media_item.uploaded_at,

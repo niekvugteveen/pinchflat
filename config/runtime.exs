@@ -79,7 +79,9 @@ config :pinchflat, Oban,
        {"0 1 * * *", Pinchflat.Downloading.MediaRetentionWorker},
        {"0 2 * * *", Pinchflat.Downloading.MediaQualityUpgradeWorker},
        {"15 * * * *", Pinchflat.Downloading.MediaLimitWorker},
-       {"5 * * * *", Pinchflat.Downloading.WatchedMediaWorker}
+       {"5 * * * *", Pinchflat.Downloading.WatchedMediaWorker},
+       # After MediaRetentionWorker (01:00) has dealt with cutoff dates and maximum ages
+       {"30 1 * * *", Pinchflat.Media.DiskCleanupWorker}
      ]}
   ]
 
