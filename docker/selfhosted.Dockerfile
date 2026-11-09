@@ -5,7 +5,11 @@ ARG OTP_VERSION=27.2.4
 ARG DEBIAN_VERSION=bookworm-20250428-slim
 
 ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
-ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
+# Runner floats on bookworm-slim instead of the dated tag: with a dated tag Komodo's weekly
+# `--pull` rebuild never picks up Debian security fixes (perl-base, gnutls stayed on the
+# April 2025 versions). The builder stays pinned, because hexpm only publishes dated tags;
+# a newer runner than builder is fine for glibc.
+ARG RUNNER_IMAGE="debian:bookworm-slim"
 
 FROM ${BUILDER_IMAGE} AS builder
 
